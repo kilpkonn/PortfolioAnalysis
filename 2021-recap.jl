@@ -141,26 +141,23 @@ end
 
 yearportfoliodf
 
-# using Plots
-using PlotlyJS
+using Plots
 
 # plotlyjs()
 
-lbls = [x for x in names(yearportfoliodf) if x != "Kuupäev"]
-plotdf = stack(yearportfoliodf, lbls)
-plotdf = DataFrames.rename(plotdf, ["Kuupäev", "Aktsia", "Väärtus"])
-plotdf = plotdf[plotdf."Väärtus" .> 0,:]
+lbls = [x for x in names(yearportfoliodf) if x != "Kuupäev"];
+plotdf = yearportfoliodf[!, lbls];
+plotdf[!, lbls] = ifelse.(plotdf[!,lbls] .<= 0.0, missing, plotdf[!,lbls]);
 
-layout = Layout(
-    xaxis_title="Kuupäev",
-    yaxis_title="Väärtus",
-    legend_title_text="Aktsiad",
-    xaxis=attr(dtick="M1", tickformat="%b", ticklabelmode="period", range=[periodstart, periodend]),
-    plot_bgcolor="white",
-    width=1800, height=1000,
+plot(
+     yearportfoliodf."Kuupäev",
+     Matrix(plotdf),
+     labels=permutedims(names(plotdf)),
+     legend=:topleft,
+     plot_title="Aktsiad",
+     xlabel="Kuupäev",
+     ylabel="Väärtus"
 )
-
-PlotlyJS.plot(plotdf, x=:Kuupäev, y=:Väärtus, color=:Aktsia, legend = :outertopright, layout)
 
 
 for c in currencies
@@ -177,35 +174,6 @@ growth = sum(last(yearportfoliodf)[1:end-1]) - sum(first(yearportfoliodf)[1:end-
 
 profit = growth - invested
 
-plotdf = plotdf = yearportfoliodf[!, ["Kuupäev"]]
-plotdf."KOKKU" = sum.(eachrow(yearportfoliodf[!, names(yearportfoliodf)[1:end-1]]))
-
-df = yearportfoliodf[!, ["Kuupäev"]]
-df."KOKKU" = sum.(eachrow(yearportfoliodf[!, names(yearportfoliodf)[1:end-1]]))
-yearbuysdf = alltradesdf[(alltradesdf."TEHINGUPÄEV" .>= periodstart) .& (alltradesdf."TEHINGUPÄEV" .<= periodend), ["TEHINGUPÄEV", "KOKKU"]]
-for row in eachrow(df)
-    row."KOKKU" += yearbuysdf[row."Kuupäev" .>= yearbuysdf."TEHINGUPÄEV", "KOKKU"] |> sum
-end
-
-df2 = alltradesdf[(alltradesdf."TEHINGUPÄEV" .>= periodstart) .& (alltradesdf."TEHINGUPÄEV" .<= periodend), ["TEHINGUPÄEV", "KOKKU"]]
-df2."KOKKU" = -df2."KOKKU"
-
-layout = Layout(
-    xaxis_title="Kuupäev",
-    yaxis_title="Väärtus",
-    xaxis=attr(dtick="M1", tickformat="%b\n%Y", ticklabelmode="period", range=[periodstart, periodend]),
-    plot_bgcolor="white",
-    width=1800, height=600,
-    barmode="relative"
-)
-plot(
-    [
-     scatter(plotdf, x=:Kuupäev, y=:KOKKU, name="Portfell")
-     scatter(df, x=:Kuupäev, y=:KOKKU, name="Naturaalne")
-     bar(df2, x=:TEHINGUPÄEV, y=:KOKKU, name="Investeering")
-    ],
-    layout
-)
 
 profitlossfiles = glob("data/*-profit-loss.csv")
 
@@ -221,33 +189,25 @@ plotdf = DataFrame()
 plotdf."Kuupäev" = yearprofitlossdf[!, "Laekumise kuupäev"]
 plotdf."Kokku" = cumsum(yearprofitlossdf."Kokku EUR")
 
-layout = Layout(
-    xaxis_title="Kuupäev",
-    yaxis_title="Väärtus",
-    legend_title_text="Aktsiad",
-    xaxis=attr(dtick="M1", tickformat="%b", ticklabelmode="period", range=[periodstart, periodend]),
-    plot_bgcolor="white",
-    width=1800, height=600,
+plot(
+    plotdf."Kuupäev",
+    plotdf."Kokku",
+    plot_title="Dividend",
+    xlabel="Kuupäev",
+    ylabel="Väärtus"
 )
-
-PlotlyJS.plot(plotdf, x=:Kuupäev, y=:Kokku, layout)
 
 avg_portfolio = sum.(eachrow(yearportfoliodf[!, names(yearportfoliodf)[1:end-1]])) |> mean
 dividend_yield = totaldividend / avg_portfolio
 
-df = DataFrame()
-df."Kuupäev" = yearprofitlossdf."Laekumise kuupäev"
-df."KOKKU" = yearprofitlossdf."Kokku EUR"
-
-layout = Layout(
-    xaxis_title="Kuupäev",
-    yaxis_title="Väärtus",
-    legend_title_text="Aktsiad",
-    xaxis=attr(dtick="M1", tickformat="%b", ticklabelmode="period", range=[periodstart, periodend]),
-    plot_bgcolor="white",
+bar(
+    yearprofitlossdf."Laekumise kuupäev",
+    yearprofitlossdf."Kokku EUR",
+    plot_title="Dividend/Intress",
+    xlabel="Kuupäev",
+    ylabel="Väärtus",
+    legend=false
 )
-
-plot(bar(df, x=:Kuupäev, y=:KOKKU, name="Dividend/Intress"), layout)
 
 df = yearportfoliodf[!, ["Kuupäev"]]
 df."Kokku" = sum.(eachrow(yearportfoliodf[!, names(yearportfoliodf)[1:end-1]]))
@@ -262,4 +222,62 @@ yearstd / avg_portfolio
 
 profit / avg_portfolio
 
+plotdf = plotdf = yearportfoliodf[!, ["Kuupäev"]]
+plotdf."KOKKU" = sum.(eachrow(yearportfoliodf[!, names(yearportfoliodf)[1:end-1]]))
 
+df = yearportfoliodf[!, ["Kuupäev"]]
+df."KOKKU" = sum.(eachrow(yearportfoliodf[!, names(yearportfoliodf)[1:end-1]]))
+yearbuysdf = alltradesdf[(alltradesdf."TEHINGUPÄEV" .>= periodstart) .& (alltradesdf."TEHINGUPÄEV" .<= periodend), ["TEHINGUPÄEV", "KOKKU"]]
+for row in eachrow(df)
+    row."KOKKU" += yearbuysdf[row."Kuupäev" .>= yearbuysdf."TEHINGUPÄEV", "KOKKU"] |> sum
+end
+
+df2 = alltradesdf[(alltradesdf."TEHINGUPÄEV" .>= periodstart) .& (alltradesdf."TEHINGUPÄEV" .<= periodend), ["TEHINGUPÄEV", "KOKKU"]]
+df2."KOKKU" = -df2."KOKKU"
+
+p = plot(
+     plotdf."Kuupäev", plotdf."KOKKU",
+     label="Portfell",
+)
+
+p = plot(
+     p,
+     df."Kuupäev", df."KOKKU",
+     label="Naturaalne",
+)
+
+p = bar(
+     p,
+     df2."TEHINGUPÄEV", df2."KOKKU",
+     label="Investeering",
+)
+
+p = bar(
+     p,
+     yearprofitlossdf."Laekumise kuupäev",
+     .-yearprofitlossdf."Kokku EUR",
+     label="Dividend/intress",
+     legend=:topleft,
+     plot_title="Aktsiad",
+     xlabel="Kuupäev",
+     ylabel="Väärtus",
+     color=:red
+)
+
+# Plot only money put in and taken out
+p = bar(
+     df2."TEHINGUPÄEV", df2."KOKKU",
+     label="Investeering",
+)
+
+p = bar(
+     p,
+     yearprofitlossdf."Laekumise kuupäev",
+     .-yearprofitlossdf."Kokku EUR",
+     label="Dividend/intress",
+     legend=:topleft,
+     plot_title="Aktsiad",
+     xlabel="Kuupäev",
+     ylabel="Väärtus",
+     color=:red
+)
