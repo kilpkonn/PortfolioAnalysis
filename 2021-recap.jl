@@ -13,18 +13,20 @@ Pkg.add("StatsPlots");
 Pkg.add("PlotlyJS");
 Pkg.add("PlotlyBase");
 Pkg.add("WebIO");
+Pkg.add("GLM");
 
 using CSV
 using DataFrames
 using MarketData
 using Glob
 using Statistics
+using GLM
 
 tradefiles = glob("data/*-trades.csv")
 
 alltradesdf = reduce(vcat, DataFrame.(CSV.File.(tradefiles)));
-alltradesdf[:,"VÄÄRTUSPÄEV"] = Date.(alltradesdf[:,"VÄÄRTUSPÄEV"])
-alltradesdf[:,"TEHINGUPÄEV"] = Date.(alltradesdf[:,"TEHINGUPÄEV"])
+alltradesdf[:,"VÄÄRTUSPÄEV"] = Date.(alltradesdf[:,"VÄÄRTUSPÄEV"]);
+alltradesdf[:,"TEHINGUPÄEV"] = Date.(alltradesdf[:,"TEHINGUPÄEV"]);
 alltradesdf = alltradesdf[in.(alltradesdf."TEHING", Ref(["ost", "müük"])), :]
 # Replace temporary symbols
 alltradesdf[alltradesdf."SÜMBOL" .== "EfTEN5", "SÜMBOL"] .= "EFT1T";
@@ -281,3 +283,39 @@ p = bar(
      ylabel="Väärtus",
      color=:red
 )
+
+# Cov, std, and more statistical stuff
+sddf = yearportfoliodf[!, ["Kuupäev"]]
+sddf."Kokku" = sum.(eachrow(yearportfoliodf[!, names(yearportfoliodf)[1:end-1]]))
+yearbuysdf = alltradesdf[(alltradesdf."TEHINGUPÄEV" .>= periodstart) .& (alltradesdf."TEHINGUPÄEV" .<= periodend), ["TEHINGUPÄEV", "KOKKU"]]
+for row in eachrow(sddf)
+    row."Kokku" += yearbuysdf[row."Kuupäev" .>= yearbuysdf."TEHINGUPÄEV", "KOKKU"] |> sum
+end
+
+lbls = [x for x in names(yearportfoliodf) if x != "Kuupäev"];
+df = DataFrame("Ticker" => String[], "Std" => Float64[], "Value" => Float64[], "PBeta" => Float64[], "Change" => Float64[]);
+for lbl in lbls
+  ticker = tickersdf[tickersdf."Ticker" .== lbl, ["timestamp", "Close"]];
+  yearvalues = sddf[in.(sddf."Kuupäev", Ref(ticker."timestamp")), ["Kuupäev", "Kokku"]];
+  ticker = ticker[in.(ticker."timestamp", Ref(yearvalues."Kuupäev")), :];
+  prices = ticker."Close";
+  sd = std(prices) / mean(prices);
+  val = last(yearportfoliodf)[lbl];
+  beta = cor(yearvalues."Kokku", prices);
+  change = last(prices) / first(prices);
+  push!(df, [lbl, sd, val, beta, change]);
+end
+
+p = scatter(
+     df."Value",
+     df."Change",
+     label="Dividend/intress",
+     legend=false,
+     plot_title="Portfelli jaotus",
+     xlabel="Väärtus",
+     ylabel="Muutus",
+);
+annotate!.(df."Value".+100, df."Change", text.(lbls, :black, :left,4));
+p
+
+
