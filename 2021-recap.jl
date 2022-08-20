@@ -95,7 +95,8 @@ currencies = unique(currentyeardf."VALUUTA")
 currencies = currencies[currencies .!= "EUR"]
 
 function download_currency(ticker)
-    data = yahoo(ticker * "EUR=X", YahooOpt(period1=DateTime(periodstart)-Dates.Day(7), period2=DateTime(periodend), interval="1d"));
+    tstart = alltradesdf[1, "TEHINGUPÄEV"] - Dates.Day(7);
+    data = yahoo(ticker * "EUR=X", YahooOpt(period1=DateTime(tstart), period2=DateTime(periodend), interval="1d"));
     df = DataFrame(data);
     df[!, "Ticker"] .= ticker;
     df
@@ -113,13 +114,13 @@ function calc_day(ticker, day)
     if amount == 0
         return 0.0
     end
-    currency = currentyeardf[range, "VALUUTA"][1]
     prices = tickersdf[(tickersdf."timestamp" .<= day) .& (tickersdf."Ticker" .== ticker), "Close"]
     if size(prices, 1) == 0
         return 0.0
     end
     price = last(prices)
         
+    currency = currentyeardf[range, "VALUUTA"][1]
     if currency == "EUR"
         return amount * price
     end
@@ -240,12 +241,14 @@ df2."KOKKU" = -df2."KOKKU"
 p = plot(
      plotdf."Kuupäev", plotdf."KOKKU",
      label="Portfell",
+     legend=:topleft,
 )
 
 p = plot(
      p,
      df."Kuupäev", df."KOKKU",
      label="Naturaalne",
+     legend=:topleft,
 )
 
 p = bar(
@@ -309,7 +312,6 @@ end
 p = scatter(
      df."Value",
      df."Change",
-     label="Dividend/intress",
      legend=false,
      plot_title="Portfelli jaotus",
      xlabel="Väärtus",
@@ -318,4 +320,50 @@ p = scatter(
 annotate!.(df."Value".+100, df."Change", text.(lbls, :black, :left,4));
 p
 
+# All time portfolio layout
+df = DataFrame("Ticker" => String[], "Std" => Float64[], "Value" => Float64[], "Change" => Float64[]);
+for lbl in tickers
+  ticker = tickersdf[tickersdf."Ticker" .== lbl, ["timestamp", "Close"]];
+
+  tradedf = alltradesdf[alltradesdf."SÜMBOL" .== lbl, :];
+  currency = tradedf[1, "VALUUTA"]
+  buyprice = 0.0;
+  sellprice = 0.0
+
+  if currency == "EUR"
+    buyprice = -sum(tradedf[tradedf."TEHING" .== "ost", "NETOSUMMA"]);
+    sellprice = sum(tradedf[tradedf."TEHING" .== "müük", "NETOSUMMA"]);
+  else
+    for row in eachrow(tradedf)
+      rates = currenciesdf[(currenciesdf."timestamp" .<= row."TEHINGUPÄEV") .& (currenciesdf."Ticker" .== currency), "Close"]
+      rate = last(rates);
+      if row."TEHING" == "ost"
+        buyprice += rate * row."HIND" * row."KOGUS";
+      else
+        sellprice += rate * row."HIND" * row."KOGUS";
+      end
+    end
+  end
+
+  sellprice += yearportfoliodf[end, lbl];
+
+  yearvalues = sddf[in.(sddf."Kuupäev", Ref(ticker."timestamp")), ["Kuupäev", "Kokku"]];
+  ticker = ticker[in.(ticker."timestamp", Ref(yearvalues."Kuupäev")), :];
+  prices = ticker."Close";
+  sd = std(prices) / mean(prices);
+  val = last(yearportfoliodf)[lbl];
+  change = sellprice / buyprice;
+  push!(df, [lbl, sd, val, change]);
+end
+
+p = scatter(
+     df."Value",
+     df."Change",
+     legend=false,
+     plot_title="Portfelli jaotus",
+     xlabel="Väärtus",
+     ylabel="Muutus",
+);
+annotate!.(df."Value".+100, df."Change", text.(tickers, :black, :left,4));
+p
 
