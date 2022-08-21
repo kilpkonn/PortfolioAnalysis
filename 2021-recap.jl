@@ -1,6 +1,6 @@
 using Dates 
-periodstart = Date(2021, 1, 1);
-periodend = Date(2021, 12, 31);
+periodstart = Date(2022, 1, 1);
+periodend = Date(2022, 08, 31);
 
 using Pkg
 
@@ -43,9 +43,9 @@ tickers = unique(alltradesdf[:,"SÜMBOL"])
 function map_symbols(sym)
     if sym in ["SXR8", "VUSA"]
         return sym * ".DE"
-    elseif sym in ["TVE1T", "MRK1T", "EFT1T", "TKM1T"]
+    elseif sym in ["TVE1T", "MRK1T", "EFT1T", "TKM1T", "SFG1T"]
         return sym * ".TL"
-    elseif sym in ["GRG1L", "KNF1L"]
+    elseif sym in ["GRG1L", "KNF1L", "SAB1L"]
         return sym * ".VS"
     elseif sym in ["GZE1R"]
         return sym * ".RG"
@@ -83,9 +83,14 @@ currentyeardf = sort!(vcat(currentyeardf, prevtradesdf), ["TEHINGUPÄEV"])
 currentyeardf[!, ["SÜMBOL", "TEHINGUPÄEV", "CUMKOGUS", "VALUUTA"]]
 
 function download(ticker)
-    data = yahoo(ticker, YahooOpt(period1=DateTime(periodstart)-Dates.Day(7), period2=DateTime(periodend), interval="1d"));
-    df = DataFrame(data);
-    df[!, "Ticker"] .= ticker;
+    df = DataFrame();
+    try
+      data = yahoo(ticker, YahooOpt(period1=DateTime(periodstart)-Dates.Day(7), period2=DateTime(periodend), interval="1d"));
+      df = DataFrame(data);
+      df[!, "Ticker"] .= ticker;
+    catch
+      print("Failed to download: ", ticker, "\n")
+    end
     df
 end
 tickersdf = reduce(vcat, [download(ticker) for ticker in tickers])
@@ -96,6 +101,7 @@ currencies = currencies[currencies .!= "EUR"]
 
 function download_currency(ticker)
     tstart = alltradesdf[1, "TEHINGUPÄEV"] - Dates.Day(7);
+    df = DataFrame();
     data = yahoo(ticker * "EUR=X", YahooOpt(period1=DateTime(tstart), period2=DateTime(periodend), interval="1d"));
     df = DataFrame(data);
     df[!, "Ticker"] .= ticker;
@@ -322,6 +328,7 @@ p
 
 # All time portfolio layout
 df = DataFrame("Ticker" => String[], "Std" => Float64[], "Value" => Float64[], "Change" => Float64[]);
+soldtickers = String[];
 for lbl in tickers
   ticker = tickersdf[tickersdf."Ticker" .== lbl, ["timestamp", "Close"]];
 
@@ -340,30 +347,51 @@ for lbl in tickers
       if row."TEHING" == "ost"
         buyprice += rate * row."HIND" * row."KOGUS";
       else
-        sellprice += rate * row."HIND" * row."KOGUS";
+        sellprice += -rate * row."HIND" * row."KOGUS";
       end
     end
   end
 
-  sellprice += yearportfoliodf[end, lbl];
+  valinhand = yearportfoliodf[end, lbl];
+
+  if valinhand <= 0.0
+    push!(soldtickers, lbl);
+  end
+
+  sellprice += valinhand;
 
   yearvalues = sddf[in.(sddf."Kuupäev", Ref(ticker."timestamp")), ["Kuupäev", "Kokku"]];
   ticker = ticker[in.(ticker."timestamp", Ref(yearvalues."Kuupäev")), :];
   prices = ticker."Close";
   sd = std(prices) / mean(prices);
-  val = last(yearportfoliodf)[lbl];
+  val = buyprice;
   change = sellprice / buyprice;
   push!(df, [lbl, sd, val, change]);
 end
 
+solddf = df[in.(df."Ticker", Ref(soldtickers)), :]
+keptdf = df[.!in.(df."Ticker", Ref(soldtickers)), :]
+
 p = scatter(
-     df."Value",
-     df."Change",
+     keptdf."Value",
+     keptdf."Change",
      legend=false,
      plot_title="Portfelli jaotus",
      xlabel="Väärtus",
      ylabel="Muutus",
 );
+
+p = scatter(
+     p,
+     solddf."Value",
+     solddf."Change",
+     legend=false,
+     plot_title="Portfelli jaotus",
+     xlabel="Väärtus",
+     ylabel="Muutus",
+     color=:red,
+);
+
 annotate!.(df."Value".+100, df."Change", text.(tickers, :black, :left,4));
 p
 
