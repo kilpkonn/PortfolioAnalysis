@@ -2,18 +2,16 @@ using Dates
 periodstart = Date(2022, 1, 1);
 periodend = Date(2022, 08, 31);
 
-using Pkg
-
-Pkg.add("CSV");
-Pkg.add("DataFrames");
-Pkg.add("MarketData");
-Pkg.add("Glob");
-Pkg.add("Plots");
-Pkg.add("StatsPlots");
-Pkg.add("PlotlyJS");
-Pkg.add("PlotlyBase");
-Pkg.add("WebIO");
-Pkg.add("GLM");
+# using Pkg
+#
+# Pkg.add("CSV");
+# Pkg.add("DataFrames");
+# Pkg.add("MarketData");
+# Pkg.add("Glob");
+# Pkg.add("Plots");
+# Pkg.add("StatsPlots");
+# Pkg.add("PlotlyBase");
+# Pkg.add("WebIO");
 
 using CSV
 using DataFrames
@@ -66,38 +64,46 @@ tickers = map(map_symbols, tickers)
 
 currentyeardf = alltradesdf[(alltradesdf."TEHINGUPÄEV".>=periodstart).&(alltradesdf."TEHINGUPÄEV".<=periodend), :]
 
-prevtradesdf = alltradesdf[alltradesdf."TEHINGUPÄEV".<=periodstart, :]
-numcols = names(prevtradesdf, findall(x -> eltype(x) <: Number, eachcol(prevtradesdf)))
-prevtradesdf = combine(groupby(prevtradesdf, ["SÜMBOL", "VALUUTA"]), numcols .=> sum .=> numcols)
-prevtradesdf."TEHING" .= "ost"
-prevtradesdf."TEHINGUPÄEV" .= periodstart
-prevtradesdf."VÄÄRTUSPÄEV" .= periodstart
-prevtradesdf."VÄÄRTPABER" .= "Dummy Value"
-prevtradesdf."KOMMENTAAR" .= ""
+prevtradesdf = alltradesdf[alltradesdf."TEHINGUPÄEV".<=periodstart, :];
+numcols = names(prevtradesdf, findall(x -> eltype(x) <: Number, eachcol(prevtradesdf)));
+prevtradesdf = combine(groupby(prevtradesdf, ["SÜMBOL", "VALUUTA"]), numcols .=> sum .=> numcols);
+prevtradesdf."TEHING" .= "ost";
+prevtradesdf."TEHINGUPÄEV" .= periodstart;
+prevtradesdf."VÄÄRTUSPÄEV" .= periodstart;
+prevtradesdf."VÄÄRTPABER" .= "Dummy Value";
+prevtradesdf."KOMMENTAAR" .= "";
 
 
 prevtradesdf
 
-currentyeardf = sort!(vcat(currentyeardf, prevtradesdf), ["TEHINGUPÄEV"])
+currentyeardf = sort!(vcat(currentyeardf, prevtradesdf), ["TEHINGUPÄEV"]);
 
 currentyeardf[!, ["SÜMBOL", "TEHINGUPÄEV", "CUMKOGUS", "VALUUTA"]]
 
 function download(ticker)
-  df = DataFrame()
+  df = DataFrame("timestamp" => Date[], "Open" => Float64[], "High" =>
+      Float64[], "Low" => Float64[], "Close" => Float64[],
+    "AdjClose" => Float64[], "Volume" => Float64[], "Ticker" =>
+      String[]);
   try
     data = yahoo(ticker, YahooOpt(period1=DateTime(periodstart) - Dates.Day(7), period2=DateTime(periodend), interval="1d"))
     df = DataFrame(data)
     df[!, "Ticker"] .= ticker
   catch
     print("Failed to download: ", ticker, "\n")
+    tmp = alltradesdf[alltradesdf."SÜMBOL" .== ticker, :];
+    for t in eachrow(tmp)
+      v = t."HIND";
+      push!(df, [t."VÄÄRTUSPÄEV" v v v v v 0 ticker]);
+    end
   end
   df
 end
-tickersdf = reduce(vcat, [download(ticker) for ticker in tickers])
+tickersdf = reduce(vcat, [download(ticker) for ticker in tickers]);
 tickersdf = tickersdf[completecases(tickersdf), :]
 
 currencies = unique(currentyeardf."VALUUTA")
-currencies = currencies[currencies.!="EUR"]
+currencies = currencies[currencies.!="EUR"];
 
 function download_currency(ticker)
   tstart = alltradesdf[1, "TEHINGUPÄEV"] - Dates.Day(7)
