@@ -333,7 +333,9 @@ annotate!.(df."Value" .+ 100, df."Change", text.(lbls, :black, :left, 4));
 p
 
 # All time portfolio layout
-df = DataFrame("Ticker" => String[], "Std" => Float64[], "Value" => Float64[], "Change" => Float64[]);
+df = DataFrame("Ticker" => String[], "Std" => Float64[], "Value" => Float64[],
+               "Change" => Float64[], "Dividends" => Float64[],
+               "TotalChange" => Float64[]);
 soldtickers = String[];
 for lbl in tickers
   ticker = tickersdf[tickersdf."Ticker".==lbl, ["timestamp", "Close"]]
@@ -358,21 +360,25 @@ for lbl in tickers
     end
   end
 
+  range = [map_symbols(x[1]) == lbl for x in split.(allprofitlossdf."Väärtpaber", " - ")];
+  dividends = allprofitlossdf[range, "Kokku EUR"] |> sum;
+
   valinhand = yearportfoliodf[end, lbl]
 
   if valinhand <= 0.0
     push!(soldtickers, lbl)
   end
 
-  sellprice += valinhand
+  sellprice += valinhand;
 
-  yearvalues = sddf[in.(sddf."Kuupäev", Ref(ticker."timestamp")), ["Kuupäev", "Kokku"]]
-  ticker = ticker[in.(ticker."timestamp", Ref(yearvalues."Kuupäev")), :]
-  prices = ticker."Close"
-  sd = std(prices) / mean(prices)
-  val = buyprice
-  change = sellprice / buyprice
-  push!(df, [lbl, sd, val, change])
+  yearvalues = sddf[in.(sddf."Kuupäev", Ref(ticker."timestamp")), ["Kuupäev", "Kokku"]];
+  ticker = ticker[in.(ticker."timestamp", Ref(yearvalues."Kuupäev")), :];
+  prices = ticker."Close";
+  sd = std(prices) / mean(prices);
+  val = buyprice;
+  change = sellprice / buyprice;
+  totalchange = (sellprice + dividends) / buyprice;
+  push!(df, [lbl, sd, val, change, dividends, totalchange]);
 end
 
 solddf = df[in.(df."Ticker", Ref(soldtickers)), :]
@@ -380,7 +386,7 @@ keptdf = df[.!in.(df."Ticker", Ref(soldtickers)), :]
 
 p = scatter(
   keptdf."Value",
-  keptdf."Change",
+  keptdf."TotalChange",
   legend=false,
   plot_title="Portfelli jaotus",
   xlabel="Väärtus",
@@ -390,7 +396,7 @@ p = scatter(
 p = scatter(
   p,
   solddf."Value",
-  solddf."Change",
+  solddf."TotalChange",
   legend=false,
   plot_title="Portfelli jaotus",
   xlabel="Väärtus",
@@ -398,6 +404,6 @@ p = scatter(
   color=:red,
 );
 
-annotate!.(df."Value" .+ 100, df."Change", text.(tickers, :black, :left, 4));
+annotate!.(df."Value" .+ 100, df."TotalChange", text.(tickers, :black, :left, 4));
 p
 
