@@ -335,7 +335,7 @@ p
 # All time portfolio layout
 df = DataFrame("Ticker" => String[], "Std" => Float64[], "Value" => Float64[],
                "Change" => Float64[], "Dividends" => Float64[],
-               "TotalChange" => Float64[]);
+               "TotalChange" => Float64[], "DaysAdj" => Float64[]);
 soldtickers = String[];
 for lbl in tickers
   ticker = tickersdf[tickersdf."Ticker".==lbl, ["timestamp", "Close"]]
@@ -371,6 +371,8 @@ for lbl in tickers
 
   sellprice += valinhand;
 
+  days = ((periodend - tradedf."TEHINGUPÄEV") .* tradedf."KOGUS" .|> Dates.value |> sum) / sum(tradedf[tradedf."TEHING" .== "ost", "KOGUS"]);
+
   yearvalues = sddf[in.(sddf."Kuupäev", Ref(ticker."timestamp")), ["Kuupäev", "Kokku"]];
   ticker = ticker[in.(ticker."timestamp", Ref(yearvalues."Kuupäev")), :];
   prices = ticker."Close";
@@ -378,7 +380,7 @@ for lbl in tickers
   val = buyprice;
   change = sellprice / buyprice;
   totalchange = (sellprice + dividends) / buyprice;
-  push!(df, [lbl, sd, val, change, dividends, totalchange]);
+  push!(df, [lbl, sd, val, change, dividends, totalchange, days]);
 end
 
 solddf = df[in.(df."Ticker", Ref(soldtickers)), :]
@@ -406,4 +408,30 @@ p = scatter(
 
 annotate!.(df."Value" .+ 100, df."TotalChange", text.(tickers, :black, :left, 4));
 p
+
+
+# Consider time period and map to me year scale or whatever..
+p = scatter(
+  keptdf."Value",
+  (keptdf."TotalChange" .- 1.0) .* 365.25 ./ keptdf."DaysAdj",
+  legend=false,
+  plot_title="Portfelli jaotus",
+  xlabel="Väärtus",
+  ylabel="Muutus",
+);
+
+p = scatter(
+  p,
+  solddf."Value",
+  (solddf."TotalChange" .- 1.0) .* 365.25 ./ solddf."DaysAdj",
+  legend=false,
+  plot_title="Portfelli jaotus",
+  xlabel="Väärtus",
+  ylabel="Muutus",
+  color=:red,
+);
+
+annotate!.(df."Value" .+ 100, (df."TotalChange" .- 1.0) .* 365.25 ./ df."DaysAdj", text.(tickers, :black, :left, 4));
+p
+
 
