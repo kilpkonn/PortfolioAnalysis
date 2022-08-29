@@ -25,15 +25,16 @@ tradefiles = glob("data/*-trades.csv")
 alltradesdf = reduce(vcat, DataFrame.(CSV.File.(tradefiles)));
 alltradesdf[:, "VÄÄRTUSPÄEV"] = Date.(alltradesdf[:, "VÄÄRTUSPÄEV"]);
 alltradesdf[:, "TEHINGUPÄEV"] = Date.(alltradesdf[:, "TEHINGUPÄEV"]);
-alltradesdf = alltradesdf[in.(alltradesdf."TEHING", Ref(["ost", "müük"])), :]
+alltradesdf = alltradesdf[in.(alltradesdf."TEHING", Ref(["ost", "müük"])), :];
+
 # Replace temporary symbols
 alltradesdf[alltradesdf."SÜMBOL".=="EfTEN5", "SÜMBOL"] .= "EFT1T";
 
 alltradesdf = sort!(alltradesdf, ["TEHINGUPÄEV"])
 
-alltradesdf.CUMKOGUS .= 0
+alltradesdf."CUMKOGUS" .= 0;
 for sym in unique(alltradesdf[!, "SÜMBOL"])
-  alltradesdf[alltradesdf."SÜMBOL".==sym, "CUMKOGUS"] = cumsum(alltradesdf[alltradesdf."SÜMBOL".==sym, "KOGUS"])
+  alltradesdf[alltradesdf."SÜMBOL".==sym, "CUMKOGUS"] = cumsum(alltradesdf[alltradesdf."SÜMBOL".==sym, "KOGUS"]);
 end
 # alltradesdf[!, ["SÜMBOL", "TEHINGUPÄEV", "CUMKOGUS"]]
 
@@ -58,11 +59,11 @@ function map_symbols(sym)
   sym
 end
 
-alltradesdf[:, "SÜMBOL"] = map(map_symbols, alltradesdf[:, "SÜMBOL"])
+alltradesdf[:, "SÜMBOL"] = map(map_symbols, alltradesdf[:, "SÜMBOL"]);
 
 tickers = map(map_symbols, tickers)
 
-currentyeardf = alltradesdf[(alltradesdf."TEHINGUPÄEV".>=periodstart).&(alltradesdf."TEHINGUPÄEV".<=periodend), :]
+currentyeardf = alltradesdf[(alltradesdf."TEHINGUPÄEV".>=periodstart).&(alltradesdf."TEHINGUPÄEV".<=periodend), :];
 
 prevtradesdf = alltradesdf[alltradesdf."TEHINGUPÄEV".<=periodstart, :];
 numcols = names(prevtradesdf, findall(x -> eltype(x) <: Number, eachcol(prevtradesdf)));
@@ -146,7 +147,7 @@ function calc_day(ticker, day)
   amount * price * rate
 end
 
-day = periodstart
+day = periodstart;
 while day < periodend
   row = [calc_day(t, day) for t in tickers]
   row = tuple(row..., day)
@@ -157,8 +158,6 @@ end
 yearportfoliodf
 
 using Plots
-
-# plotlyjs()
 
 lbls = [x for x in names(yearportfoliodf) if x != "Kuupäev"];
 plotdf = yearportfoliodf[!, lbls];
