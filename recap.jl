@@ -1,6 +1,6 @@
 using Dates
 periodstart = Date(2022, 1, 1);
-periodend = Date(2022, 08, 31);
+periodend = Date(2022, 12, 31);
 
 # using Pkg
 #
@@ -163,16 +163,22 @@ lbls = [x for x in names(yearportfoliodf) if x != "Kuupäev"];
 plotdf = yearportfoliodf[!, lbls];
 plotdf[!, lbls] = ifelse.(plotdf[!, lbls] .<= 0.0, missing, plotdf[!, lbls]);
 
-plot(
+plotly();
+
+p = plot(
   yearportfoliodf."Kuupäev",
   Matrix(plotdf),
   labels=permutedims(names(plotdf)),
-  legend=:topleft,
-  plot_title="Aktsiad",
-  xlabel="Kuupäev",
-  ylabel="Väärtus"
+  legend=:outerright,
+  # plot_title="Aktsiad",
+  # xlabel="Kuupäev",
+  # ylabel="Väärtus",
+  plot_title="Stocks",
+  xlabel="Date",
+  ylabel="Value",
+  size=(1100, 600),
+  # dpi=800,
 )
-
 
 for c in currencies
   range = (alltradesdf."VALUUTA" .== c) .& (alltradesdf."TEHINGUPÄEV" .>= periodstart)
