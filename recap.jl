@@ -257,33 +257,39 @@ df2."KOKKU" = -df2."KOKKU"
 
 p = plot(
   plotdf."Kuupäev", plotdf."KOKKU",
-  label="Portfell",
+  label="Portfolio",
   legend=:topleft,
+  size=(1100, 600),
 )
 
 p = plot(
   p,
   df."Kuupäev", df."KOKKU",
-  label="Naturaalne",
+  label="Natural",
   legend=:topleft,
+  size=(1100, 600),
 )
+
+# p = twinx();
 
 p = bar(
   p,
   df2."TEHINGUPÄEV", df2."KOKKU",
-  label="Investeering",
+  label="Investment",
+  size=(1100, 600),
 )
 
 p = bar(
   p,
   yearprofitlossdf."Laekumise kuupäev",
   .-yearprofitlossdf."Kokku EUR",
-  label="Dividend/intress",
+  label="Dividend/intres",
   legend=:topleft,
-  plot_title="Aktsiad",
-  xlabel="Kuupäev",
-  ylabel="Väärtus",
-  color=:red
+  plot_title="Overall performance",
+  xlabel="Date",
+  ylabel="Value",
+  color=:red,
+  size=(1100, 600),
 )
 
 # Plot only money put in and taken out
@@ -312,7 +318,7 @@ for row in eachrow(sddf)
   row."Kokku" += yearbuysdf[row."Kuupäev".>=yearbuysdf."TEHINGUPÄEV", "KOKKU"] |> sum
 end
 
-lbls = [x for x in names(yearportfoliodf) if x != "Kuupäev"];
+lbls = [x for x in names(yearportfoliodf) if x != "Kuupäev"]; # BUG: Needs to be reinitiated for next plots
 df = DataFrame("Ticker" => String[], "Std" => Float64[], "Value" => Float64[], "PBeta" => Float64[], "Change" => Float64[]);
 for lbl in lbls
   ticker = tickersdf[tickersdf."Ticker".==lbl, ["timestamp", "Close"]]
@@ -333,6 +339,7 @@ p = scatter(
   plot_title="Portfelli jaotus",
   xlabel="Väärtus",
   ylabel="Muutus",
+  size=(1100, 600),
 );
 annotate!.(df."Value" .+ 100, df."Change", text.(lbls, :black, :left, 4));
 p
@@ -398,6 +405,7 @@ p = scatter(
   plot_title="Portfelli jaotus",
   xlabel="Väärtus",
   ylabel="Muutus",
+  size=(1100, 600),
 );
 
 p = scatter(
@@ -409,6 +417,7 @@ p = scatter(
   xlabel="Väärtus",
   ylabel="Muutus",
   color=:red,
+  size=(1100, 600),
 );
 
 annotate!.(df."Value" .+ 100, df."TotalChange", text.(tickers, :black, :left, 4));
@@ -419,24 +428,28 @@ p
 p = scatter(
   keptdf."Value",
   (keptdf."TotalChange" .- 1.0) .* 365.25 ./ keptdf."DaysAdj",
+  label="Investments",
   legend=false,
   plot_title="Portfelli jaotus",
-  xlabel="Väärtus",
-  ylabel="Muutus",
+  xlabel="Value",
+  ylabel="Change",
+  size=(1100, 600),
 );
 
 p = scatter(
   p,
   solddf."Value",
   (solddf."TotalChange" .- 1.0) .* 365.25 ./ solddf."DaysAdj",
+  label="Sold",
   legend=false,
-  plot_title="Portfelli jaotus",
-  xlabel="Väärtus",
-  ylabel="Muutus",
+  plot_title="Portfolio distribution",
+  xlabel="Value",
+  ylabel="Change",
   color=:red,
+  size=(1100, 600),
 );
 
-annotate!.(df."Value" .+ 100, (df."TotalChange" .- 1.0) .* 365.25 ./ df."DaysAdj", text.(tickers, :black, :left, 4));
+annotate!.(df."Value" .+ 100, (df."TotalChange" .- 1.0) .* 365.25 ./ df."DaysAdj", text.(tickers, :black, :left, 6));
 p
 
 
