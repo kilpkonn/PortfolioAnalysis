@@ -1,6 +1,6 @@
 using Dates
-periodstart = Date(2022, 1, 1);
-periodend = Date(2022, 12, 31);
+periodstart = Date(2024, 1, 1);
+periodend = Date(2024, 12, 31);
 
 # using Pkg
 #
@@ -44,7 +44,12 @@ function map_symbols(sym)
     return sym * ".DE"
   elseif sym in ["TVE1T", "MRK1T", "EFT1T", "TKM1T", "SFG1T"]
     return sym * ".TL"
-  elseif sym in ["GRG1L", "KNF1L", "SAB1L"]
+  elseif sym in ["GRG1L", "KNF1L", "SAB1L", "LNA1L", "AKO1L", "IGN1L"]
+    if sym == "KNF1L"
+      sym = "KNE1L"
+    elseif sym == "LNA1L"
+      sym = "AKO1L"
+    end
     return sym * ".VS"
   elseif sym in ["GZE1R"]
     return sym * ".RG"
@@ -55,6 +60,8 @@ function map_symbols(sym)
     return sym * ".ST"
   elseif sym == "LQDA"
     return "IBCD.DE"
+  elseif sym in ["RBI"]
+    return sym * ".VI"
   end
   sym
 end
@@ -170,9 +177,6 @@ p = plot(
   Matrix(plotdf),
   labels=permutedims(names(plotdf)),
   legend=:outerright,
-  # plot_title="Aktsiad",
-  # xlabel="Kuupäev",
-  # ylabel="Väärtus",
   plot_title="Stocks",
   xlabel="Date",
   ylabel="Value",
@@ -327,8 +331,8 @@ for lbl in lbls
   prices = ticker."Close"
   sd = std(prices) / mean(prices)
   val = last(yearportfoliodf)[lbl]
-  beta = cor(yearvalues."Kokku", prices)
-  change = last(prices) / first(prices)
+  beta = if (nrow(yearvalues) == 0) 1 else cor(yearvalues."Kokku", prices) end
+  change = if (nrow(yearvalues) == 0) 1 else last(prices) / first(prices) end
   push!(df, [lbl, sd, val, beta, change])
 end
 
