@@ -38,9 +38,8 @@ for sym in unique(alltradesdf[!, "SÜMBOL"])
 end
 # alltradesdf[!, ["SÜMBOL", "TEHINGUPÄEV", "CUMKOGUS"]]
 
-tickers = unique(alltradesdf[:, "SÜMBOL"])
 function map_symbols(sym)
-  if sym in ["SXR8", "VUSA"]
+  if sym in ["SXR8", "VUSA", "VMID"]
     return sym * ".DE"
   elseif sym in ["TVE1T", "MRK1T", "EFT1T", "TKM1T", "SFG1T"]
     return sym * ".TL"
@@ -49,6 +48,8 @@ function map_symbols(sym)
       sym = "KNE1L"
     elseif sym == "LNA1L"
       sym = "AKO1L"
+    elseif sym == "SAB1L"
+      sym = "ROE1L"
     end
     return sym * ".VS"
   elseif sym in ["GZE1R"]
@@ -62,13 +63,15 @@ function map_symbols(sym)
     return "IBCD.DE"
   elseif sym in ["RBI"]
     return sym * ".VI"
+  elseif sym in ["KER"]
+    return sym * ".WA"
   end
   sym
 end
 
 alltradesdf[:, "SÜMBOL"] = map(map_symbols, alltradesdf[:, "SÜMBOL"]);
 
-tickers = map(map_symbols, tickers)
+tickers = unique(alltradesdf[:, "SÜMBOL"])
 
 currentyeardf = alltradesdf[(alltradesdf."TEHINGUPÄEV".>=periodstart).&(alltradesdf."TEHINGUPÄEV".<=periodend), :];
 
@@ -135,6 +138,7 @@ function calc_day(ticker, day)
     return 0.0
   end
   prices = tickersdf[(tickersdf."timestamp".<=day).&(tickersdf."Ticker".==ticker), "Close"]
+  prices = filter(x -> !isnothing(x), prices)
   if size(prices, 1) == 0
     return 0.0
   end
@@ -328,11 +332,12 @@ for lbl in lbls
   ticker = tickersdf[tickersdf."Ticker".==lbl, ["timestamp", "Close"]]
   yearvalues = sddf[in.(sddf."Kuupäev", Ref(ticker."timestamp")), ["Kuupäev", "Kokku"]]
   ticker = ticker[in.(ticker."timestamp", Ref(yearvalues."Kuupäev")), :]
-  prices = ticker."Close"
+  prices = ticker."Close" .|> a -> isnothing(a) ? missing : a
+  replace!(prices, missing => mean(skipmissing(prices)))
   sd = std(prices) / mean(prices)
   val = last(yearportfoliodf)[lbl]
-  beta = if (nrow(yearvalues) == 0) 1 else cor(yearvalues."Kokku", prices) end
-  change = if (nrow(yearvalues) == 0) 1 else last(prices) / first(prices) end
+  beta = if (nrow(yearvalues) != length(prices) || nrow(yearvalues) == 0) 1 else cor(yearvalues."Kokku", prices) end
+  change = if (nrow(yearvalues) != length(prices) || nrow(yearvalues) == 0) 1 else last(prices) / first(prices) end
   push!(df, [lbl, sd, val, beta, change])
 end
 
@@ -391,7 +396,8 @@ for lbl in tickers
 
   yearvalues = sddf[in.(sddf."Kuupäev", Ref(ticker."timestamp")), ["Kuupäev", "Kokku"]];
   ticker = ticker[in.(ticker."timestamp", Ref(yearvalues."Kuupäev")), :];
-  prices = ticker."Close";
+  prices = ticker."Close" .|> a -> isnothing(a) ? missing : a
+  replace!(prices, missing => mean(skipmissing(prices)))
   sd = std(prices) / mean(prices);
   val = buyprice;
   change = sellprice / buyprice;
